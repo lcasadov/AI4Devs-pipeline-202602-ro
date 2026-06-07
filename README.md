@@ -162,6 +162,51 @@ POST http://localhost:3010/candidates
 }
 ```
 
+## Running the whole app with Docker (frontend + backend + database)
+
+Besides the database, the entire stack can run in containers. The following files define it:
+
+- `docker-compose.yml`: orchestrates three services — `db` (PostgreSQL), `backend` (Express) and `frontend` (React served by Nginx).
+- `backend/Dockerfile`: multi-stage build (compiles TypeScript, generates the Prisma client) that, on start, runs `prisma migrate deploy` and then launches the server.
+- `frontend/Dockerfile`: multi-stage build that compiles the React app and serves it with Nginx.
+- `frontend/nginx.conf`: serves the SPA and proxies `/api/...` to the `backend` container, so the browser only needs to talk to its own origin.
+- `backend/.dockerignore` and `frontend/.dockerignore`: prevent local files (such as `.env`, `node_modules`, `build/`, `dist/`) from being copied into the images.
+
+### Steps
+
+1. Make sure Docker is running and that the root `.env` file defines `DB_USER`, `DB_PASSWORD`, `DB_NAME` and `DB_PORT` (the compose file reads these).
+2. From the project root, build and start everything:
+   ```sh
+   docker compose up -d --build
+   ```
+3. Once the containers are healthy, the app is available at:
+   - Frontend: http://localhost
+   - Backend API (direct): http://localhost:3010
+   - Backend API (through Nginx): http://localhost/api/...
+   - PostgreSQL: localhost:5432
+4. (Optional) Seed the database with example data. Run the seed against the containerized database:
+   ```sh
+   cd backend
+   npx ts-node prisma/seed.ts
+   ```
+
+Useful commands:
+```sh
+docker compose logs -f backend   # follow backend logs
+docker compose ps                # service status
+docker compose down              # stop everything (data persists in the pgdata volume)
+docker compose down -v           # stop and ALSO delete the database volume
+```
+
+### Important note about `DATABASE_URL` inside containers
+
+Inside a container, `localhost` refers to the container itself, **not** the database. For this reason:
+
+- `backend/prisma/schema.prisma` reads the connection string from the environment with `url = env("DATABASE_URL")` instead of hardcoding it.
+- `docker-compose.yml` injects `DATABASE_URL` pointing to the service name (`@db:5432`), not `localhost`.
+
+This works for local development too: your `backend/.env` keeps pointing to `localhost`, so `npm run dev` outside Docker still connects to the database on your machine.
+
 ## Setting up EC2 and GitHub Actions
 
 To run this project on an EC2 instance and ensure GitHub Actions works correctly, follow these steps:
@@ -418,6 +463,51 @@ POST http://localhost:3010/candidates
 }
 ```
 
+
+## Ejecutar toda la aplicación con Docker (frontend + backend + base de datos)
+
+Además de la base de datos, todo el stack puede ejecutarse en contenedores. Los siguientes archivos lo definen:
+
+- `docker-compose.yml`: orquesta tres servicios — `db` (PostgreSQL), `backend` (Express) y `frontend` (React servido por Nginx).
+- `backend/Dockerfile`: build multi-etapa (compila TypeScript, genera el cliente de Prisma) que, al arrancar, ejecuta `prisma migrate deploy` y luego levanta el servidor.
+- `frontend/Dockerfile`: build multi-etapa que compila la app de React y la sirve con Nginx.
+- `frontend/nginx.conf`: sirve la SPA y reenvía `/api/...` al contenedor `backend`, de modo que el navegador solo habla con su propio origen.
+- `backend/.dockerignore` y `frontend/.dockerignore`: evitan que archivos locales (como `.env`, `node_modules`, `build/`, `dist/`) se copien dentro de las imágenes.
+
+### Pasos
+
+1. Asegúrate de que Docker esté en ejecución y de que el archivo `.env` de la raíz defina `DB_USER`, `DB_PASSWORD`, `DB_NAME` y `DB_PORT` (el compose los lee).
+2. Desde la raíz del proyecto, construye y levanta todo:
+   ```sh
+   docker compose up -d --build
+   ```
+3. Cuando los contenedores estén sanos (`healthy`), la aplicación estará disponible en:
+   - Frontend: http://localhost
+   - API backend (directo): http://localhost:3010
+   - API backend (a través de Nginx): http://localhost/api/...
+   - PostgreSQL: localhost:5432
+4. (Opcional) Pobla la base con datos de ejemplo. Ejecuta el seed contra la base de datos del contenedor:
+   ```sh
+   cd backend
+   npx ts-node prisma/seed.ts
+   ```
+
+Comandos útiles:
+```sh
+docker compose logs -f backend   # seguir los logs del backend
+docker compose ps                # estado de los servicios
+docker compose down              # parar todo (los datos persisten en el volumen pgdata)
+docker compose down -v           # parar y ADEMÁS borrar el volumen de la base de datos
+```
+
+### Nota importante sobre `DATABASE_URL` dentro de los contenedores
+
+Dentro de un contenedor, `localhost` se refiere al propio contenedor, **no** a la base de datos. Por ese motivo:
+
+- `backend/prisma/schema.prisma` lee la cadena de conexión del entorno con `url = env("DATABASE_URL")` en lugar de tenerla fija en el código.
+- `docker-compose.yml` inyecta `DATABASE_URL` apuntando al nombre del servicio (`@db:5432`), no a `localhost`.
+
+Esto también funciona para el desarrollo local: tu `backend/.env` sigue apuntando a `localhost`, así que `npm run dev` fuera de Docker continúa conectándose a la base de datos de tu máquina.
 
 ## Configuración de EC2 y GitHub Actions
 
